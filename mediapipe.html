@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div class="container">
+    <video class="input_video"></video>
+    <canvas class="output_canvas" width="1280px" height="720px"></canvas>
+  </div>
+</body>
+<script type="module">
+  const videoElement = document.getElementsByClassName('input_video')[0];
+  const canvasElement = document.getElementsByClassName('output_canvas')[0];
+  const canvasCtx = canvasElement.getContext('2d');
+  
+
+
+  function onResults(results) {
+    canvasCtx.save();
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    canvasCtx.drawImage(
+        results.image, 0, 0, canvasElement.width, canvasElement.height);
+    
+
+    if (results.multiHandLandmarks && results.multiHandedness) {
+      var output = [];
+      for (let index = 0; index < results.multiHandLandmarks.length; index++) {
+        const classification = results.multiHandedness[index];
+        const isRightHand = classification.label === 'Right';
+        const hand_landmarks = results.multiHandLandmarks[index];
+        const type = isRightHand ? 'Right' : 'Left';
+        console.log(classification.label);
+        console.log(isRightHand);
+        console.log(type);
+        //points
+        var landmark_coordinate = [];
+        var landmarks = [];
+        var point = [];
+        var x_pivot = hand_landmarks[0].x;
+        var y_pivot = hand_landmarks[0].y;
+        var z_pivot = hand_landmarks[0].z;
+        landmark_coordinate['x'] = x_pivot;
+        landmark_coordinate['y'] = y_pivot;
+        landmark_coordinate['z'] = z_pivot;
+        point['points'] = [];
+        Object.assign(point['points'], landmark_coordinate);
+        landmarks['WRIST'] = [];
+        Object.assign(landmarks['WRIST'], point);
+        
+        var points = ['THUMB_CMC','THUMB_MCP','THUMB_IP','THUMB_TIP','INDEX_FINGER_MCP','INDEX_FINGER_PIP','INDEX_FINGER_DIP','INDEX_FINGER_TIP','MIDDLE_FINGER_MCP','MIDDLE_FINGER_PIP','MIDDLE_FINGER_DIP','MIDDLE_FINGER_TIP','RING_FINGER_MCP','RING_FINGER_PIP','RING_FINGER_DIP','RING_FINGER_TIP','PINKY_MCP','PINKY_PIP','PINKY_DIP','PINKY_TIP'];
+        
+        for(let idx = 1; idx < hand_landmarks.length; idx++){
+          let x = hand_landmarks[idx].x;
+          let y = hand_landmarks[idx].y;
+          let z = hand_landmarks[idx].z;
+          let distance = Math.sqrt(Math.pow((x - x_pivot),2) + Math.pow((y - y_pivot),2) + Math.pow((z - z_pivot),2));
+          console.log(distance);
+          landmark_coordinate['x'] = x;
+          landmark_coordinate['y'] = y;
+          landmark_coordinate['z'] = z;
+          point['points'] = [];
+          Object.assign(point['points'], landmark_coordinate);
+          point['distance'] = distance;
+          landmarks[points[idx-1]] = [];
+          Object.assign(landmarks[points[idx-1]], point);
+        }
+        output['landmarks_'+type] = [];
+        Object.assign(output['landmarks_'+type], landmarks);
+        
+        console.log(output);
+        /*drawConnectors(canvasCtx, hand_landmarks, HAND_CONNECTIONS,
+                       {color: '#00FF00', lineWidth: 5});
+        drawLandmarks(canvasCtx, hand_landmarks, {color: '#FF0000', lineWidth: 2});*/
+        drawConnectors(canvasCtx, hand_landmarks, HAND_CONNECTIONS, {color: isRightHand ? '#00FF00' : '#FF0000', lineWidth: 5});
+        drawLandmarks(canvasCtx, hand_landmarks, {color: isRightHand ? '#00FF00' : '#FF0000',fillColor: isRightHand ? '#FF0000' : '#00FF00', lineWidth: 2});
+      }
+    }
+    canvasCtx.restore();
+  }
+
+  const hands = new Hands({locateFile: (file) => {
+    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+  }});
+  hands.setOptions({
+    maxNumHands: 2,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5
+  });
+  hands.onResults(onResults);
+
+  const camera = new Camera(videoElement, {
+    onFrame: async () => {
+      await hands.send({image: videoElement});
+    },
+    width: 1280,
+    height: 720
+  });
+  camera.start();
+</script>
+</html>
